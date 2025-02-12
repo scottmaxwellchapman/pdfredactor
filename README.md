@@ -1,9 +1,12 @@
 PDF Redactor is an open source Java application that helps legal professionals redact PDFs.
 
 Developed by Scott Maxwell Chapman
+
 pdfredactor@chapmanlaw.group
 
 Home Page: https://www.chapmanlaw.group/wordpress/index.php/pdf-redactor/
+
+
 Demo Video: https://www.youtube.com/watch?v=3-Cps6Ynl6Q
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, 
