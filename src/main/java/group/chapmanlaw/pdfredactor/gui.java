@@ -4,11 +4,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.util.HashMap;
+import java.io.IOException;
 import java.util.List;
-import java.util.Map;
-import javax.imageio.ImageIO;
 
 public class gui extends JFrame {
     private List<String> imagePaths;
@@ -41,7 +38,7 @@ public class gui extends JFrame {
         }
 
         // Create Image Panel with reference to this (gui instance)
-        imagePanel = new ImagePanel(getPageImage(currentPage, false), this);
+        imagePanel = new ImagePanel(loadCurrentPageImage(), this);
         JScrollPane scrollPane = new JScrollPane(imagePanel);
         scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
         scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
@@ -67,7 +64,7 @@ public class gui extends JFrame {
         zoomOutButton.addActionListener(e -> zoomOut());
 
         finishButton = new JButton("Finish");
-        finishButton.addActionListener(e -> finishAction(imagePaths));
+        finishButton.addActionListener(e -> finishAction());
 
         navPanel.add(undoButton);
         navPanel.add(prevButton);
@@ -96,11 +93,12 @@ public class gui extends JFrame {
         });
     }
 
-    private BufferedImage loadImage(String path) {
+    private BufferedImage loadCurrentPageImage() {
         try {
-            return ImageIO.read(new File(path));
-        } catch (Exception e) {
+            return logic.getOrRenderPage(currentPage);
+        } catch (IOException e) {
             e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error rendering page: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             return null;
         }
     }
@@ -123,12 +121,18 @@ public class gui extends JFrame {
 
     private void skipPage() {
         currentPage = niceties.skipPrompt();
-        renderCurrentPage(false);
+        imagePanel.setImage(loadCurrentPageImage());
+        updateButtonState();
+        pageLabel.setText("Page "+Integer.toString(getCurrentPage()+1)+" of "+logic.getTotalPages());
+        this.repaint();
     }
 
     private void changePage(int direction) {
         currentPage += direction;
-        renderCurrentPage(false);
+        imagePanel.setImage(loadCurrentPageImage());
+        updateButtonState();
+        pageLabel.setText("Page "+Integer.toString(getCurrentPage()+1)+" of "+logic.getTotalPages());
+        this.repaint();
     }
 
     private void updateButtonState() {
@@ -137,8 +141,19 @@ public class gui extends JFrame {
     }
 
     private void undo() {
-        redactor.undo(imagePaths.get(currentPage));
-        renderCurrentPage(true);
+        try {
+            String currentImagePath = logic.getOrRenderImagePath(currentPage);
+            redactor.undo(currentImagePath);
+            logic.refreshPageFromDisk(currentPage);
+            imagePanel.setImage(loadCurrentPageImage());
+        } catch (IOException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error undoing redaction: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        updateButtonState();
+        pageLabel.setText("Page "+Integer.toString(getCurrentPage()+1)+" of "+logic.getTotalPages());
+        this.repaint();
     }
 
     public int getCurrentPage() {
@@ -149,13 +164,18 @@ public class gui extends JFrame {
         SwingUtilities.invokeLater(() -> new gui());
     }
 
-    private void finishAction(List<String> imagePaths) {
-        if (imagePaths != null && !imagePaths.isEmpty()) {
-            // Assuming combiner is an object that has the combine method
-            mycombiner.combine(imagePaths);
-            JOptionPane.showMessageDialog(this, "PDF created successfully.", "Success", JOptionPane.INFORMATION_MESSAGE);
-        } else {
-            JOptionPane.showMessageDialog(this, "No images to combine.", "Error", JOptionPane.ERROR_MESSAGE);
+    private void finishAction() {
+        try {
+            List<String> exportPaths = logic.getAllImagePathsForExport();
+            if (exportPaths != null && !exportPaths.isEmpty()) {
+                mycombiner.combine(exportPaths);
+                JOptionPane.showMessageDialog(this, "PDF created successfully.", "Success", JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(this, "No images to combine.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error preparing pages for export: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
 
         resetCoordinates();  // Reset coordinates when finishing redaction
@@ -212,9 +232,14 @@ class ImagePanel extends JPanel {
                         int x2 = imageX, y2 = imageY;
 
                         if (x2 > x1 && y2 > y1) {
-                            String imagePath = logic.getImagePaths().get(parentGui.getCurrentPage());
-                            redactor.redact(imagePath, x1, y1, x2, y2);
-                            parentGui.renderCurrentPage(true);
+                            try {
+                                String imagePath = logic.getOrRenderImagePath(parentGui.getCurrentPage());
+                                redactor.redact(imagePath, x1, y1, x2, y2);
+                                logic.refreshPageFromDisk(parentGui.getCurrentPage());
+                                setImage(logic.getOrRenderPage(parentGui.getCurrentPage()));
+                            } catch (IOException ioException) {
+                                ioException.printStackTrace();
+                            }
                         }
 
                         firstClick = null;
