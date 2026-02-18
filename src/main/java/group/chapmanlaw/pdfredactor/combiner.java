@@ -21,7 +21,10 @@ public class combiner {
             PDDocument document = new PDDocument();
 
             // Iterate over the image paths
+            int pageIndex = 0;
             for (String imagePath : imagePaths) {
+                pageIndex++;
+                myw.updateProgress("Building final PDF...", pageIndex, imagePaths.size());
                 File imageFile = new File(imagePath);
                 if (imageFile.exists()) {
                     // Create a letter-sized page (8.5 x 11 inches)
@@ -75,6 +78,7 @@ public class combiner {
             int result = fileChooser.showSaveDialog(null);
             if (result == JFileChooser.APPROVE_OPTION) {
                 File outputFile = fileChooser.getSelectedFile();
+                myw.updateProgress("Saving final PDF...", imagePaths.size(), imagePaths.size());
                 document.save(outputFile);
                 myw.setVisible(false);
                 JOptionPane.showMessageDialog(null, "PDF saved successfully!");

@@ -15,6 +15,19 @@ public class working extends javax.swing.JFrame {
      */
     public working() {
         initComponents();
+        setDefaultCloseOperation(javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE);
+    }
+
+    public void updateProgress(String statusText, int currentPage, int totalPages) {
+        String safeStatus = statusText == null ? "Working..." : statusText;
+        int safeTotal = Math.max(totalPages, 1);
+        int safeCurrent = Math.max(0, Math.min(currentPage, safeTotal));
+        javax.swing.SwingUtilities.invokeLater(() -> {
+            jLabel1.setText(safeStatus + " (" + safeCurrent + "/" + safeTotal + ")");
+            progressBar.setMaximum(safeTotal);
+            progressBar.setValue(safeCurrent);
+            progressBar.setString(safeCurrent + "/" + safeTotal);
+        });
     }
 
     /**
@@ -27,27 +40,34 @@ public class working extends javax.swing.JFrame {
     private void initComponents() {
 
         jLabel1 = new javax.swing.JLabel();
+        progressBar = new javax.swing.JProgressBar();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
         jLabel1.setFont(new java.awt.Font("Helvetica Neue", 1, 18)); // NOI18N
         jLabel1.setText("Working ...");
 
+        progressBar.setStringPainted(true);
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
-                .addContainerGap(31, Short.MAX_VALUE)
-                .addComponent(jLabel1)
-                .addGap(29, 29, 29))
+                .addGap(26, 26, 26)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.CENTER)
+                    .addComponent(jLabel1)
+                    .addComponent(progressBar, javax.swing.GroupLayout.PREFERRED_SIZE, 263, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addContainerGap(26, Short.MAX_VALUE))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
                 .addGap(23, 23, 23)
                 .addComponent(jLabel1)
-                .addContainerGap(27, Short.MAX_VALUE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(progressBar, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(21, Short.MAX_VALUE))
         );
 
         pack();
@@ -90,5 +110,6 @@ public class working extends javax.swing.JFrame {
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JLabel jLabel1;
+    private javax.swing.JProgressBar progressBar;
     // End of variables declaration//GEN-END:variables
 }

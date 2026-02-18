@@ -17,6 +17,7 @@ public class gui extends JFrame {
     private JButton finishButton;
     private combiner mycombiner = new combiner();
     private JLabel pageLabel = new JLabel();
+    private JLabel statusLabel = new JLabel(" ");
     JLabel coordinatesLabel = new JLabel("X: , Y: ");  // Label to display coordinates
 
     public gui() {
@@ -76,6 +77,7 @@ public class gui extends JFrame {
         navPanel.add(finishButton);
         navPanel.add(exitButton);
         navPanel.add(coordinatesLabel);  // Add coordinates label to the navigation panel
+        navPanel.add(statusLabel);
         add(navPanel, BorderLayout.SOUTH);
 
         updateButtonState();
@@ -140,15 +142,32 @@ public class gui extends JFrame {
     }
 
     private void finishAction(List<String> imagePaths) {
-        if (imagePaths != null && !imagePaths.isEmpty()) {
-            // Assuming combiner is an object that has the combine method
-            mycombiner.combine(imagePaths);
-            JOptionPane.showMessageDialog(this, "PDF created successfully.", "Success", JOptionPane.INFORMATION_MESSAGE);
-        } else {
+        if (imagePaths == null || imagePaths.isEmpty()) {
             JOptionPane.showMessageDialog(this, "No images to combine.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
         }
 
-        resetCoordinates();  // Reset coordinates when finishing redaction
+        setOperationBusy(true, "Saving final PDF...");
+        SwingWorker<Void, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Void doInBackground() {
+                mycombiner.combine(imagePaths);
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                setOperationBusy(false, " ");
+                try {
+                    get();
+                    JOptionPane.showMessageDialog(gui.this, "PDF created successfully.", "Success", JOptionPane.INFORMATION_MESSAGE);
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(gui.this, "Error creating PDF: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                }
+                resetCoordinates();  // Reset coordinates when finishing redaction
+            }
+        };
+        worker.execute();
     }
 
     private void exitClick() {
@@ -157,6 +176,23 @@ public class gui extends JFrame {
 
     private void resetCoordinates() {
         coordinatesLabel.setText("X: , Y: ");
+    }
+
+    void setTransientStatus(String message) {
+        statusLabel.setText(message == null || message.isBlank() ? " " : message);
+    }
+
+    private void setOperationBusy(boolean busy, String message) {
+        prevButton.setEnabled(!busy && currentPage > 0);
+        nextButton.setEnabled(!busy && currentPage < totalPages - 1);
+        skipButton.setEnabled(!busy);
+        zoomInButton.setEnabled(!busy);
+        zoomOutButton.setEnabled(!busy);
+        exitButton.setEnabled(!busy);
+        undoButton.setEnabled(!busy);
+        finishButton.setEnabled(!busy);
+        imagePanel.setEnabled(!busy);
+        setTransientStatus(message);
     }
 
     // Zoom In and Zoom Out methods
@@ -199,8 +235,10 @@ class ImagePanel extends JPanel {
 
                         if (x2 > x1 && y2 > y1) {
                             String imagePath = logic.getImagePaths().get(parentGui.getCurrentPage());
+                            parentGui.setTransientStatus("Applying redaction...");
                             redactor.redact(imagePath, x1, y1, x2, y2);
                             setImage(loadImage(imagePath));
+                            parentGui.setTransientStatus(" ");
                         }
 
                         firstClick = null;

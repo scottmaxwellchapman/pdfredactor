@@ -48,6 +48,7 @@ public class logic {
             myw.setLocationRelativeTo(null);
 
             for (int i = 0; i < totalPages; i++) {
+                myw.updateProgress("Converting PDF pages...", i + 1, totalPages);
                 BufferedImage image = renderer.renderImageWithDPI(i, 150, ImageType.RGB); // Lower DPI for compression
 
                 File tempFile = File.createTempFile("pdfredactor_" + (i + 1), ".jpg");
@@ -60,6 +61,7 @@ public class logic {
                 System.out.println("Saved page " + (i + 1) + " as: " + tempFile.getAbsolutePath());
             }
             System.out.println("Conversion completed. Total pages: " + totalPages);
+            myw.updateProgress("Conversion complete", totalPages, totalPages);
             myw.setVisible(false);
         } catch (IOException e) {
             e.printStackTrace();
