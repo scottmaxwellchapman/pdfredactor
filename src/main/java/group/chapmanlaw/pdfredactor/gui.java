@@ -5,7 +5,9 @@ import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.imageio.ImageIO;
 
 public class gui extends JFrame {
@@ -17,6 +19,7 @@ public class gui extends JFrame {
     private JButton finishButton;
     private combiner mycombiner = new combiner();
     private JLabel pageLabel = new JLabel();
+    private final Map<Integer, BufferedImage> pageImageCache = new HashMap<>();
     JLabel coordinatesLabel = new JLabel("X: , Y: ");  // Label to display coordinates
 
     public gui() {
@@ -38,7 +41,7 @@ public class gui extends JFrame {
         }
 
         // Create Image Panel with reference to this (gui instance)
-        imagePanel = new ImagePanel(loadImage(imagePaths.get(currentPage)), this);
+        imagePanel = new ImagePanel(getPageImage(currentPage, false), this);
         JScrollPane scrollPane = new JScrollPane(imagePanel);
         scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
         scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
@@ -102,20 +105,30 @@ public class gui extends JFrame {
         }
     }
 
+    private BufferedImage getPageImage(int pageIndex, boolean forceReload) {
+        if (!forceReload && pageImageCache.containsKey(pageIndex)) {
+            return pageImageCache.get(pageIndex);
+        }
+
+        BufferedImage loadedImage = loadImage(imagePaths.get(pageIndex));
+        pageImageCache.put(pageIndex, loadedImage);
+        return loadedImage;
+    }
+
+    void renderCurrentPage(boolean forceReload) {
+        imagePanel.setImage(getPageImage(currentPage, forceReload));
+        updateButtonState();
+        pageLabel.setText("Page " + Integer.toString(getCurrentPage() + 1) + " of " + logic.getTotalPages());
+    }
+
     private void skipPage() {
         currentPage = niceties.skipPrompt();
-        imagePanel.setImage(loadImage(imagePaths.get(currentPage)));
-        updateButtonState();
-        pageLabel.setText("Page "+Integer.toString(getCurrentPage()+1)+" of "+logic.getTotalPages());
-        this.repaint();
+        renderCurrentPage(false);
     }
 
     private void changePage(int direction) {
         currentPage += direction;
-        imagePanel.setImage(loadImage(imagePaths.get(currentPage)));
-        updateButtonState();
-        pageLabel.setText("Page "+Integer.toString(getCurrentPage()+1)+" of "+logic.getTotalPages());
-        this.repaint();
+        renderCurrentPage(false);
     }
 
     private void updateButtonState() {
@@ -125,10 +138,7 @@ public class gui extends JFrame {
 
     private void undo() {
         redactor.undo(imagePaths.get(currentPage));
-        imagePanel.setImage(loadImage(imagePaths.get(currentPage)));
-        updateButtonState();
-        pageLabel.setText("Page "+Integer.toString(getCurrentPage()+1)+" of "+logic.getTotalPages());
-        this.repaint();
+        renderCurrentPage(true);
     }
 
     public int getCurrentPage() {
@@ -182,6 +192,10 @@ class ImagePanel extends JPanel {
         addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
+                if (image == null) {
+                    return;
+                }
+
                 int clickX = (int) ((e.getX() - drawX) / zoomFactor);
                 int clickY = (int) ((e.getY() - drawY) / zoomFactor);
 
@@ -200,7 +214,7 @@ class ImagePanel extends JPanel {
                         if (x2 > x1 && y2 > y1) {
                             String imagePath = logic.getImagePaths().get(parentGui.getCurrentPage());
                             redactor.redact(imagePath, x1, y1, x2, y2);
-                            setImage(loadImage(imagePath));
+                            parentGui.renderCurrentPage(true);
                         }
 
                         firstClick = null;
@@ -213,6 +227,10 @@ class ImagePanel extends JPanel {
         addMouseMotionListener(new MouseMotionAdapter() {
             @Override
             public void mouseMoved(MouseEvent e) {
+                if (image == null) {
+                    return;
+                }
+
                 int mouseX = (int) ((e.getX() - drawX) / zoomFactor);
                 int mouseY = (int) ((e.getY() - drawY) / zoomFactor);
 
@@ -226,18 +244,11 @@ class ImagePanel extends JPanel {
         });
     }
 
-    private BufferedImage loadImage(String path) {
-        try {
-            return ImageIO.read(new File(path));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
-
     public void setImage(BufferedImage newImage) {
+        image = null;
         this.image = newImage;
         updatePreferredSize();
+        revalidate();
         repaint();
     }
 
@@ -260,6 +271,10 @@ class ImagePanel extends JPanel {
     }
 
     private void updatePreferredSize() {
+        if (image == null) {
+            setPreferredSize(new Dimension(0, 0));
+            return;
+        }
         int width = (int) (image.getWidth() * zoomFactor);
         int height = (int) (image.getHeight() * zoomFactor);
         setPreferredSize(new Dimension(width, height));
