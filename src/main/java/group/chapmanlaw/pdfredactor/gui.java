@@ -151,8 +151,10 @@ public class gui extends JFrame {
         try {
             List<String> exportPaths = logic.getAllImagePathsForExport();
             if (exportPaths != null && !exportPaths.isEmpty()) {
-                mycombiner.combine(exportPaths);
-                JOptionPane.showMessageDialog(this, "PDF created successfully.", "Success", JOptionPane.INFORMATION_MESSAGE);
+                boolean saved = mycombiner.combine(exportPaths);
+                if (!saved) {
+                    JOptionPane.showMessageDialog(this, "Save cancelled. No PDF was created.", "Cancelled", JOptionPane.WARNING_MESSAGE);
+                }
             } else {
                 JOptionPane.showMessageDialog(this, "No images to combine.", "Error", JOptionPane.ERROR_MESSAGE);
             }
@@ -170,6 +172,7 @@ public class gui extends JFrame {
 
     private void resetCoordinates() {
         coordinatesLabel.setText("X: , Y: ");
+        imagePanel.resetSelection();
     }
 
     // Zoom In and Zoom Out methods
@@ -186,6 +189,7 @@ class ImagePanel extends JPanel {
     private BufferedImage image;
     private int drawX, drawY, drawWidth, drawHeight;
     private int[] firstClick = null;
+    private int[] currentHover = null;
     private gui parentGui;
     private double zoomFactor = 1.0;
 
@@ -209,6 +213,8 @@ class ImagePanel extends JPanel {
 
                 if (firstClick == null) {
                     firstClick = new int[]{imageX, imageY};
+                    currentHover = new int[]{imageX, imageY};
+                    repaint();
                     return;
                 }
 
@@ -218,6 +224,7 @@ class ImagePanel extends JPanel {
                 int y2 = Math.max(firstClick[1], imageY);
 
                 firstClick = null;
+                currentHover = null;
 
                 if (x1 == x2 || y1 == y2) {
                     JOptionPane.showMessageDialog(parentGui,
@@ -234,21 +241,38 @@ class ImagePanel extends JPanel {
                     setImage(logic.getOrRenderPage(parentGui.getCurrentPage()));
                 } catch (IOException ioException) {
                     ioException.printStackTrace();
+                    resetSelection();
                 }
             }
         });
 
-        // MouseMotionListener to update the coordinates while moving the mouse
+        // MouseMotionListener to update coordinates and preview selection while moving the mouse
         addMouseMotionListener(new MouseMotionAdapter() {
             @Override
             public void mouseMoved(MouseEvent e) {
+                handleMouseMotion(e);
+            }
+
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                handleMouseMotion(e);
+            }
+
+            private void handleMouseMotion(MouseEvent e) {
                 int mouseX = e.getX() - drawX;
                 int mouseY = e.getY() - drawY;
 
-                if (isWithinImageBounds(mouseX, mouseY)) {
-                    int imageX = toImageX(mouseX);
-                    int imageY = toImageY(mouseY);
-                    parentGui.coordinatesLabel.setText("X: " + imageX + ", Y: " + imageY);
+                if (!isWithinImageBounds(mouseX, mouseY)) {
+                    return;
+                }
+
+                int imageX = toImageX(mouseX);
+                int imageY = toImageY(mouseY);
+                parentGui.coordinatesLabel.setText("X: " + imageX + ", Y: " + imageY);
+
+                if (firstClick != null) {
+                    currentHover = new int[]{imageX, imageY};
+                    repaint();
                 }
             }
         });
@@ -281,13 +305,36 @@ class ImagePanel extends JPanel {
         return clamp((int) ((panelY / (double) scaledHeight) * image.getHeight()), 0, image.getHeight() - 1);
     }
 
+    private int toPanelX(int imageX) {
+        if (image == null) {
+            return 0;
+        }
+        int scaledWidth = (int) (drawWidth * zoomFactor);
+        return clamp((int) Math.round((imageX / (double) image.getWidth()) * scaledWidth), 0, scaledWidth);
+    }
+
+    private int toPanelY(int imageY) {
+        if (image == null) {
+            return 0;
+        }
+        int scaledHeight = (int) (drawHeight * zoomFactor);
+        return clamp((int) Math.round((imageY / (double) image.getHeight()) * scaledHeight), 0, scaledHeight);
+    }
+
     private int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(value, max));
     }
 
     public void setImage(BufferedImage newImage) {
         this.image = newImage;
+        resetSelection();
         updatePreferredSize();
+        repaint();
+    }
+
+    public void resetSelection() {
+        firstClick = null;
+        currentHover = null;
         repaint();
     }
 
@@ -340,6 +387,28 @@ class ImagePanel extends JPanel {
             drawY = (panelHeight - drawHeight) / 2;
 
             g.drawImage(image, drawX, drawY, (int)(drawWidth * zoomFactor), (int)(drawHeight * zoomFactor), this);
+
+            if (firstClick != null && currentHover != null) {
+                int previewX1 = toPanelX(firstClick[0]) + drawX;
+                int previewY1 = toPanelY(firstClick[1]) + drawY;
+                int previewX2 = toPanelX(currentHover[0]) + drawX;
+                int previewY2 = toPanelY(currentHover[1]) + drawY;
+
+                int previewX = Math.min(previewX1, previewX2);
+                int previewY = Math.min(previewY1, previewY2);
+                int previewWidth = Math.abs(previewX2 - previewX1);
+                int previewHeight = Math.abs(previewY2 - previewY1);
+
+                Graphics2D g2 = (Graphics2D) g.create();
+                try {
+                    g2.setColor(new Color(255, 105, 180, 90));
+                    g2.fillRect(previewX, previewY, previewWidth, previewHeight);
+                    g2.setColor(new Color(255, 20, 147));
+                    g2.drawRect(previewX, previewY, previewWidth, previewHeight);
+                } finally {
+                    g2.dispose();
+                }
+            }
 
             g.setColor(Color.BLUE);
             g.drawRect(drawX, drawY, (int)(drawWidth * zoomFactor), (int)(drawHeight * zoomFactor));
