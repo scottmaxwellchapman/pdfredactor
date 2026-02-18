@@ -10,6 +10,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -64,8 +65,7 @@ public class redactor {
                 backupFile.deleteOnExit(); // Ensure the backup is deleted on exit
 
                 // Copy the original file to the backup file
-                BufferedImage originalImage = ImageIO.read(originalFile);
-                saveCompressedJPEG(originalImage, backupFile, 1.0f); // Save backup at full quality
+                Files.copy(originalFile.toPath(), backupFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
                 System.out.println("Backup created: " + backupFile.getAbsolutePath());
             }
         } catch (IOException e) {
