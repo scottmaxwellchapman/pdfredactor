@@ -17,6 +17,7 @@ public class gui extends JFrame {
     private JButton finishButton;
     private combiner mycombiner = new combiner();
     private JLabel pageLabel = new JLabel();
+    private JLabel instructionLabel = new JLabel();
     JLabel coordinatesLabel = new JLabel("X: , Y: ");  // Label to display coordinates
 
     public gui() {
@@ -78,6 +79,10 @@ public class gui extends JFrame {
         navPanel.add(coordinatesLabel);  // Add coordinates label to the navigation panel
         add(navPanel, BorderLayout.SOUTH);
 
+        instructionLabel.setText("Click top-left then bottom-right to redact. Undo to reset page. Use Zoom In/Out as needed. Click Finish to save PDF.");
+        instructionLabel.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+        add(instructionLabel, BorderLayout.NORTH);
+
         updateButtonState();
         setVisible(true);
         imagePanel.zoomIn();
@@ -103,7 +108,18 @@ public class gui extends JFrame {
     }
 
     private void skipPage() {
-        currentPage = niceties.skipPrompt();
+        Integer requestedPage = niceties.skipPrompt();
+        if (requestedPage == null) {
+            JOptionPane.showMessageDialog(this, "Please enter a page number between 1 and " + totalPages + ".", "Invalid Page", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        if (requestedPage < 0 || requestedPage >= totalPages) {
+            JOptionPane.showMessageDialog(this, "Page number must be between 1 and " + totalPages + ".", "Invalid Page", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        currentPage = requestedPage;
         imagePanel.setImage(loadImage(imagePaths.get(currentPage)));
         updateButtonState();
         pageLabel.setText("Page "+Integer.toString(getCurrentPage()+1)+" of "+logic.getTotalPages());

@@ -4,6 +4,8 @@
  */
 package group.chapmanlaw.pdfredactor;
 
+import javax.swing.SpinnerNumberModel;
+
 /**
  *
  * @author scottmaxwellchapman
@@ -30,7 +32,8 @@ public class launch extends javax.swing.JFrame {
         jLabel2 = new javax.swing.JLabel();
         jButton1 = new javax.swing.JButton();
         jLabel4 = new javax.swing.JLabel();
-        jTextField1 = new javax.swing.JTextField();
+        qualitySlider = new javax.swing.JSlider();
+        qualitySpinner = new javax.swing.JSpinner();
         jLabel5 = new javax.swing.JLabel();
         jLabel6 = new javax.swing.JLabel();
         jLabel7 = new javax.swing.JLabel();
@@ -38,6 +41,7 @@ public class launch extends javax.swing.JFrame {
         jLabel10 = new javax.swing.JLabel();
         jLabel11 = new javax.swing.JLabel();
         jLabel12 = new javax.swing.JLabel();
+        qualityValueLabel = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
@@ -59,10 +63,21 @@ public class launch extends javax.swing.JFrame {
         jLabel4.setFont(new java.awt.Font("Helvetica Neue", 1, 14)); // NOI18N
         jLabel4.setText("Quality:");
 
-        jTextField1.setText("0.5");
-        jTextField1.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                jTextField1ActionPerformed(evt);
+        qualitySlider.setMajorTickSpacing(1);
+        qualitySlider.setMaximum(10);
+        qualitySlider.setMinimum(1);
+        qualitySlider.setPaintTicks(true);
+        qualitySlider.setValue(5);
+        qualitySlider.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                qualitySliderStateChanged(evt);
+            }
+        });
+
+        qualitySpinner.setModel(new SpinnerNumberModel(Double.valueOf(0.5d), Double.valueOf(0.1d), Double.valueOf(1.0d), Double.valueOf(0.1d)));
+        qualitySpinner.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                qualitySpinnerStateChanged(evt);
             }
         });
 
@@ -85,6 +100,9 @@ public class launch extends javax.swing.JFrame {
 
         jLabel12.setFont(new java.awt.Font("Helvetica Neue", 1, 14)); // NOI18N
         jLabel12.setText("2) Click bottom right of redaction area.");
+
+        qualityValueLabel.setFont(new java.awt.Font("Helvetica Neue", 1, 14)); // NOI18N
+        qualityValueLabel.setText("Selected: 0.5");
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
@@ -122,7 +140,11 @@ public class launch extends javax.swing.JFrame {
                                 .addGap(18, 18, 18)
                                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                                     .addComponent(jLabel9)
-                                    .addComponent(jTextField1, javax.swing.GroupLayout.PREFERRED_SIZE, 50, javax.swing.GroupLayout.PREFERRED_SIZE))))
+                                    .addGroup(layout.createSequentialGroup()
+                                        .addComponent(qualitySlider, javax.swing.GroupLayout.PREFERRED_SIZE, 140, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                        .addComponent(qualitySpinner, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                    .addComponent(qualityValueLabel))))
                         .addGap(0, 0, Short.MAX_VALUE)))
                 .addContainerGap())
         );
@@ -141,9 +163,12 @@ public class launch extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jLabel5)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 10, Short.MAX_VALUE)
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.CENTER)
                     .addComponent(jLabel4)
-                    .addComponent(jTextField1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addComponent(qualitySlider, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(qualitySpinner, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(qualityValueLabel)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jLabel9)
                 .addGap(120, 120, 120)
@@ -161,19 +186,37 @@ public class launch extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
-        logic.qualitySetting=Float.parseFloat(jTextField1.getText());
+        logic.qualitySetting=((Double) qualitySpinner.getValue()).floatValue();
                 this.setVisible(false);
                 javax.swing.JOptionPane.showMessageDialog(null, "The larger your PDF is, the larger the load and save time will be. Please be patient with large PDFs.");
         logic.convertPDFToImages();
         gui myGui = new gui();
 
         myGui.setVisible(true);
-        
+
     }//GEN-LAST:event_jButton1ActionPerformed
 
-    private void jTextField1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jTextField1ActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_jTextField1ActionPerformed
+    private void qualitySliderStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_qualitySliderStateChanged
+        double selectedValue = qualitySlider.getValue() / 10.0;
+        double spinnerValue = ((Double) qualitySpinner.getValue());
+        if (Math.abs(spinnerValue - selectedValue) > 0.0001) {
+            qualitySpinner.setValue(Double.valueOf(selectedValue));
+        }
+        updateQualityValueLabel(selectedValue);
+    }//GEN-LAST:event_qualitySliderStateChanged
+
+    private void qualitySpinnerStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_qualitySpinnerStateChanged
+        double selectedValue = ((Double) qualitySpinner.getValue());
+        int sliderValue = (int) Math.round(selectedValue * 10);
+        if (qualitySlider.getValue() != sliderValue) {
+            qualitySlider.setValue(sliderValue);
+        }
+        updateQualityValueLabel(selectedValue);
+    }//GEN-LAST:event_qualitySpinnerStateChanged
+
+    private void updateQualityValueLabel(double qualityValue) {
+        qualityValueLabel.setText(String.format("Selected: %.1f", qualityValue));
+    }
 
     /**
      * @param args the command line arguments
@@ -222,6 +265,8 @@ public class launch extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel6;
     private javax.swing.JLabel jLabel7;
     private javax.swing.JLabel jLabel9;
-    private javax.swing.JTextField jTextField1;
+    private javax.swing.JSlider qualitySlider;
+    private javax.swing.JSpinner qualitySpinner;
+    private javax.swing.JLabel qualityValueLabel;
     // End of variables declaration//GEN-END:variables
 }

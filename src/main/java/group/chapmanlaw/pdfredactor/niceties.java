@@ -118,10 +118,23 @@ public static void exitAd() {
         }
     }
     
-    public static int skipPrompt(){
-        int out = 0;
-        out = Integer.parseInt(JOptionPane.showInputDialog("Skip to page #"));
-        return out-1;
+    public static Integer skipPrompt(){
+        String response = JOptionPane.showInputDialog("Skip to page #");
+
+        if (response == null) {
+            return null;
+        }
+
+        String trimmedResponse = response.trim();
+        if (trimmedResponse.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return Integer.parseInt(trimmedResponse) - 1;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
     
 }
