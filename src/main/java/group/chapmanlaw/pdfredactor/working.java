@@ -15,6 +15,7 @@ public class working extends javax.swing.JFrame {
      */
     public working() {
         initComponents();
+        setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
     }
 
     /**
