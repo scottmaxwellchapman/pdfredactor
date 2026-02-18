@@ -172,40 +172,72 @@ public class gui extends JFrame {
 class ImagePanel extends JPanel {
     private BufferedImage image;
     private int drawX, drawY, drawWidth, drawHeight;
-    private int[] firstClick = null;
+    private Rectangle dragSelection = null;
+    private Rectangle pendingSelection = null;
+    private Point dragStart = null;
     private gui parentGui;
     private double zoomFactor = 1.0;
+    private int displayedImageWidth;
+    private int displayedImageHeight;
 
     public ImagePanel(BufferedImage image, gui parentGui) {
         this.image = image;
         this.parentGui = parentGui;
+
+        setFocusable(true);
+
+        InputMap inputMap = getInputMap(WHEN_IN_FOCUSED_WINDOW);
+        ActionMap actionMap = getActionMap();
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "applySelection");
+        actionMap.put("applySelection", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                applyPendingSelection();
+            }
+        });
+
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "cancelSelection");
+        actionMap.put("cancelSelection", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                cancelSelection();
+            }
+        });
+
         addMouseListener(new MouseAdapter() {
             @Override
-            public void mouseClicked(MouseEvent e) {
-                int clickX = (int) ((e.getX() - drawX) / zoomFactor);
-                int clickY = (int) ((e.getY() - drawY) / zoomFactor);
-
-                if (clickX >= 0 && clickX <= drawWidth / zoomFactor && clickY >= 0 && clickY <= drawHeight / zoomFactor) {
-                    int imageX = (int) ((clickX / (double) drawWidth) * image.getWidth());
-                    int imageY = (int) ((clickY / (double) drawHeight) * image.getHeight());
-
-                    parentGui.coordinatesLabel.setText("X: " + imageX + ", Y: " + imageY);  // Update coordinates in real time
-
-                    if (firstClick == null) {
-                        firstClick = new int[]{imageX, imageY};
-                    } else {
-                        int x1 = firstClick[0], y1 = firstClick[1];
-                        int x2 = imageX, y2 = imageY;
-
-                        if (x2 > x1 && y2 > y1) {
-                            String imagePath = logic.getImagePaths().get(parentGui.getCurrentPage());
-                            redactor.redact(imagePath, x1, y1, x2, y2);
-                            setImage(loadImage(imagePath));
-                        }
-
-                        firstClick = null;
-                    }
+            public void mousePressed(MouseEvent e) {
+                requestFocusInWindow();
+                Point imagePoint = toImagePoint(e.getX(), e.getY());
+                if (imagePoint != null) {
+                    dragStart = imagePoint;
+                    dragSelection = new Rectangle(dragStart.x, dragStart.y, 0, 0);
+                    pendingSelection = null;
+                    repaint();
                 }
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                if (dragStart == null || dragSelection == null) {
+                    return;
+                }
+
+                updateSelection(e.getX(), e.getY());
+                if (dragSelection.width > 0 && dragSelection.height > 0) {
+                    pendingSelection = new Rectangle(dragSelection);
+                    parentGui.coordinatesLabel.setText(
+                            "X: " + pendingSelection.x + ", Y: " + pendingSelection.y
+                                    + " | W: " + pendingSelection.width + ", H: " + pendingSelection.height
+                                    + " (Enter=apply, Esc=cancel)"
+                    );
+                } else {
+                    parentGui.coordinatesLabel.setText("X: , Y: ");
+                }
+
+                dragStart = null;
+                dragSelection = null;
+                repaint();
             }
         });
 
@@ -213,17 +245,86 @@ class ImagePanel extends JPanel {
         addMouseMotionListener(new MouseMotionAdapter() {
             @Override
             public void mouseMoved(MouseEvent e) {
-                int mouseX = (int) ((e.getX() - drawX) / zoomFactor);
-                int mouseY = (int) ((e.getY() - drawY) / zoomFactor);
+                Point imagePoint = toImagePoint(e.getX(), e.getY());
+                if (imagePoint != null && pendingSelection == null) {
+                    parentGui.coordinatesLabel.setText("X: " + imagePoint.x + ", Y: " + imagePoint.y + " | W: 0, H: 0");
+                }
+            }
 
-                if (mouseX >= 0 && mouseX <= drawWidth / zoomFactor && mouseY >= 0 && mouseY <= drawHeight / zoomFactor) {
-                    int imageX = (int) ((mouseX / (double) drawWidth) * image.getWidth());
-                    int imageY = (int) ((mouseY / (double) drawHeight) * image.getHeight());
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                if (dragStart == null) {
+                    return;
+                }
 
-                    parentGui.coordinatesLabel.setText("X: " + imageX + ", Y: " + imageY);  // Update coordinates on mouse move
+                updateSelection(e.getX(), e.getY());
+                if (dragSelection != null) {
+                    parentGui.coordinatesLabel.setText(
+                            "X: " + dragSelection.x + ", Y: " + dragSelection.y
+                                    + " | W: " + dragSelection.width + ", H: " + dragSelection.height
+                    );
+                    repaint();
                 }
             }
         });
+    }
+
+    private void updateSelection(int panelX, int panelY) {
+        Point imagePoint = toImagePoint(panelX, panelY);
+        if (imagePoint == null) {
+            return;
+        }
+
+        int x = Math.min(dragStart.x, imagePoint.x);
+        int y = Math.min(dragStart.y, imagePoint.y);
+        int width = Math.abs(imagePoint.x - dragStart.x);
+        int height = Math.abs(imagePoint.y - dragStart.y);
+        dragSelection = new Rectangle(x, y, width, height);
+    }
+
+    private Point toImagePoint(int panelX, int panelY) {
+        if (image == null) {
+            return null;
+        }
+
+        if (panelX < drawX || panelY < drawY || panelX > drawX + displayedImageWidth || panelY > drawY + displayedImageHeight) {
+            return null;
+        }
+
+        int clampedX = Math.max(drawX, Math.min(panelX, drawX + displayedImageWidth));
+        int clampedY = Math.max(drawY, Math.min(panelY, drawY + displayedImageHeight));
+
+        double xRatio = (clampedX - drawX) / (double) displayedImageWidth;
+        double yRatio = (clampedY - drawY) / (double) displayedImageHeight;
+
+        int imageX = Math.min(image.getWidth() - 1, Math.max(0, (int) (xRatio * image.getWidth())));
+        int imageY = Math.min(image.getHeight() - 1, Math.max(0, (int) (yRatio * image.getHeight())));
+        return new Point(imageX, imageY);
+    }
+
+    private void applyPendingSelection() {
+        if (pendingSelection == null || pendingSelection.width <= 0 || pendingSelection.height <= 0) {
+            return;
+        }
+
+        String imagePath = logic.getImagePaths().get(parentGui.getCurrentPage());
+        int x1 = pendingSelection.x;
+        int y1 = pendingSelection.y;
+        int x2 = pendingSelection.x + pendingSelection.width;
+        int y2 = pendingSelection.y + pendingSelection.height;
+
+        redactor.redact(imagePath, x1, y1, x2, y2);
+        pendingSelection = null;
+        parentGui.coordinatesLabel.setText("X: , Y: ");
+        setImage(loadImage(imagePath));
+    }
+
+    private void cancelSelection() {
+        dragStart = null;
+        dragSelection = null;
+        pendingSelection = null;
+        parentGui.coordinatesLabel.setText("X: , Y: ");
+        repaint();
     }
 
     private BufferedImage loadImage(String path) {
@@ -237,6 +338,7 @@ class ImagePanel extends JPanel {
 
     public void setImage(BufferedImage newImage) {
         this.image = newImage;
+        cancelSelection();
         updatePreferredSize();
         repaint();
     }
@@ -285,11 +387,35 @@ class ImagePanel extends JPanel {
 
             drawX = (panelWidth - drawWidth) / 2;
             drawY = (panelHeight - drawHeight) / 2;
+            displayedImageWidth = (int)(drawWidth * zoomFactor);
+            displayedImageHeight = (int)(drawHeight * zoomFactor);
 
-            g.drawImage(image, drawX, drawY, (int)(drawWidth * zoomFactor), (int)(drawHeight * zoomFactor), this);
+            g.drawImage(image, drawX, drawY, displayedImageWidth, displayedImageHeight, this);
 
             g.setColor(Color.BLUE);
-            g.drawRect(drawX, drawY, (int)(drawWidth * zoomFactor), (int)(drawHeight * zoomFactor));
+            g.drawRect(drawX, drawY, displayedImageWidth, displayedImageHeight);
+
+            Graphics2D g2d = (Graphics2D) g.create();
+            Rectangle overlayRect = dragSelection != null ? dragSelection : pendingSelection;
+            if (overlayRect != null) {
+                int overlayX = drawX + (int) ((overlayRect.x / (double) image.getWidth()) * displayedImageWidth);
+                int overlayY = drawY + (int) ((overlayRect.y / (double) image.getHeight()) * displayedImageHeight);
+                int overlayWidth = (int) ((overlayRect.width / (double) image.getWidth()) * displayedImageWidth);
+                int overlayHeight = (int) ((overlayRect.height / (double) image.getHeight()) * displayedImageHeight);
+
+                g2d.setColor(new Color(0, 102, 255, 80));
+                g2d.fillRect(overlayX, overlayY, overlayWidth, overlayHeight);
+                g2d.setColor(new Color(0, 102, 255));
+                g2d.drawRect(overlayX, overlayY, overlayWidth, overlayHeight);
+            }
+
+            if (pendingSelection != null) {
+                g2d.setColor(new Color(0, 0, 0, 170));
+                g2d.fillRoundRect(drawX + 10, drawY + 10, 220, 24, 8, 8);
+                g2d.setColor(Color.WHITE);
+                g2d.drawString("Enter: apply  Esc: cancel", drawX + 18, drawY + 27);
+            }
+            g2d.dispose();
         }
     }
 }
