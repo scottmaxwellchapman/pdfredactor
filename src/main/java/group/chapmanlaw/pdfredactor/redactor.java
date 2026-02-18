@@ -10,14 +10,20 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class redactor {
 
-    // Temporary backup file to store the original image before redaction
-    private static File backupFile = null;
+    // Per-page backup stacks to store snapshots before each redaction
+    private static final Map<String, Deque<Path>> backupFilesByPage = new HashMap<>();
 
     /**
      * Redacts a given area on a JPEG image by drawing a black rectangle.
@@ -57,17 +63,18 @@ public class redactor {
      */
     private static void backupImage(String inputJpgPath) {
         try {
-            // Only create a backup if it doesn't already exist
-            if (backupFile == null) {
-                File originalFile = new File(inputJpgPath);
-                backupFile = File.createTempFile("backup_", ".jpg"); // Create a temporary backup file
-                backupFile.deleteOnExit(); // Ensure the backup is deleted on exit
+            File originalFile = new File(inputJpgPath);
+            Path backupPath = Files.createTempFile("backup_", ".jpg"); // Create a temporary backup file
+            backupPath.toFile().deleteOnExit(); // Ensure the backup is deleted on exit
 
-                // Copy the original file to the backup file
-                BufferedImage originalImage = ImageIO.read(originalFile);
-                saveCompressedJPEG(originalImage, backupFile, 1.0f); // Save backup at full quality
-                System.out.println("Backup created: " + backupFile.getAbsolutePath());
-            }
+            // Copy the original file to the backup file
+            BufferedImage originalImage = ImageIO.read(originalFile);
+            saveCompressedJPEG(originalImage, backupPath.toFile(), 1.0f); // Save backup at full quality
+
+            backupFilesByPage
+                    .computeIfAbsent(inputJpgPath, key -> new ArrayDeque<>())
+                    .push(backupPath);
+            System.out.println("Backup created: " + backupPath.toAbsolutePath());
         } catch (IOException e) {
             System.err.println("Error backing up the image: " + e.getMessage());
         }
@@ -105,15 +112,18 @@ public class redactor {
      * @param inputJpgPath Path to the JPEG file.
      */
     public static void undo(String inputJpgPath) {
-        if (backupFile != null && backupFile.exists()) {
+        Deque<Path> pageBackups = backupFilesByPage.get(inputJpgPath);
+        if (pageBackups != null && !pageBackups.isEmpty()) {
+            Path backupPath = pageBackups.pop();
             // Restore the original image from the backup
             File imageFile = new File(inputJpgPath);
-            if (imageFile.exists()) {
-                imageFile.delete(); // Delete the redacted file
-            }
             try {
                 // Copy the backup file back to the original file location
-                Files.copy(backupFile.toPath(), imageFile.toPath());
+                Files.copy(backupPath, imageFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                Files.deleteIfExists(backupPath);
+                if (pageBackups.isEmpty()) {
+                    backupFilesByPage.remove(inputJpgPath);
+                }
             } catch (IOException ex) {
                 Logger.getLogger(redactor.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -121,5 +131,22 @@ public class redactor {
         } else {
             System.out.println("No backup found, undo not possible.");
         }
+    }
+
+    /**
+     * Clears all page-specific undo stacks and removes temporary snapshots.
+     */
+    public static void clearUndoHistory() {
+        for (Deque<Path> pageBackups : backupFilesByPage.values()) {
+            while (!pageBackups.isEmpty()) {
+                Path backupPath = pageBackups.pop();
+                try {
+                    Files.deleteIfExists(backupPath);
+                } catch (IOException ex) {
+                    Logger.getLogger(redactor.class.getName()).log(Level.WARNING, null, ex);
+                }
+            }
+        }
+        backupFilesByPage.clear();
     }
 }

@@ -102,6 +102,9 @@ public static void exitAd() {
         e.printStackTrace();
     }
 
+    // Clean up redaction session state
+    redactor.clearUndoHistory();
+
     // Exit the application
     System.exit(0);
 }
