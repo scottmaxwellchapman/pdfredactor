@@ -161,19 +161,41 @@ public class launch extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
-        logic.qualitySetting=Float.parseFloat(jTextField1.getText());
-                this.setVisible(false);
-                javax.swing.JOptionPane.showMessageDialog(null, "The larger your PDF is, the larger the load and save time will be. Please be patient with large PDFs.");
+        Float quality = parseQuality(jTextField1.getText());
+        if (quality == null) {
+            javax.swing.JOptionPane.showMessageDialog(this,
+                    "Quality must be a number between 0.1 and 1.0.",
+                    "Invalid quality",
+                    javax.swing.JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        logic.qualitySetting = quality;
+        this.setVisible(false);
+        javax.swing.JOptionPane.showMessageDialog(null, "The larger your PDF is, the larger the load and save time will be. Please be patient with large PDFs.");
         logic.convertPDFToImages();
         gui myGui = new gui();
 
         myGui.setVisible(true);
-        
+
     }//GEN-LAST:event_jButton1ActionPerformed
 
     private void jTextField1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jTextField1ActionPerformed
         // TODO add your handling code here:
     }//GEN-LAST:event_jTextField1ActionPerformed
+
+
+    private Float parseQuality(String rawValue) {
+        try {
+            float parsed = Float.parseFloat(rawValue);
+            if (parsed < 0.1f || parsed > 1.0f) {
+                return null;
+            }
+            return parsed;
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
 
     /**
      * @param args the command line arguments
