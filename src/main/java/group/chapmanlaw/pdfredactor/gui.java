@@ -4,9 +4,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
-import java.io.File;
+import java.io.IOException;
 import java.util.List;
-import javax.imageio.ImageIO;
 
 public class gui extends JFrame {
     private List<String> imagePaths;
@@ -38,7 +37,7 @@ public class gui extends JFrame {
         }
 
         // Create Image Panel with reference to this (gui instance)
-        imagePanel = new ImagePanel(loadImage(imagePaths.get(currentPage)), this);
+        imagePanel = new ImagePanel(loadCurrentPageImage(), this);
         JScrollPane scrollPane = new JScrollPane(imagePanel);
         scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
         scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
@@ -64,7 +63,7 @@ public class gui extends JFrame {
         zoomOutButton.addActionListener(e -> zoomOut());
 
         finishButton = new JButton("Finish");
-        finishButton.addActionListener(e -> finishAction(imagePaths));
+        finishButton.addActionListener(e -> finishAction());
 
         navPanel.add(undoButton);
         navPanel.add(prevButton);
@@ -93,18 +92,19 @@ public class gui extends JFrame {
         });
     }
 
-    private BufferedImage loadImage(String path) {
+    private BufferedImage loadCurrentPageImage() {
         try {
-            return ImageIO.read(new File(path));
-        } catch (Exception e) {
+            return logic.getOrRenderPage(currentPage);
+        } catch (IOException e) {
             e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error rendering page: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             return null;
         }
     }
 
     private void skipPage() {
         currentPage = niceties.skipPrompt();
-        imagePanel.setImage(loadImage(imagePaths.get(currentPage)));
+        imagePanel.setImage(loadCurrentPageImage());
         updateButtonState();
         pageLabel.setText("Page "+Integer.toString(getCurrentPage()+1)+" of "+logic.getTotalPages());
         this.repaint();
@@ -112,7 +112,7 @@ public class gui extends JFrame {
 
     private void changePage(int direction) {
         currentPage += direction;
-        imagePanel.setImage(loadImage(imagePaths.get(currentPage)));
+        imagePanel.setImage(loadCurrentPageImage());
         updateButtonState();
         pageLabel.setText("Page "+Integer.toString(getCurrentPage()+1)+" of "+logic.getTotalPages());
         this.repaint();
@@ -124,8 +124,16 @@ public class gui extends JFrame {
     }
 
     private void undo() {
-        redactor.undo(imagePaths.get(currentPage));
-        imagePanel.setImage(loadImage(imagePaths.get(currentPage)));
+        try {
+            String currentImagePath = logic.getOrRenderImagePath(currentPage);
+            redactor.undo(currentImagePath);
+            logic.refreshPageFromDisk(currentPage);
+            imagePanel.setImage(loadCurrentPageImage());
+        } catch (IOException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error undoing redaction: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
         updateButtonState();
         pageLabel.setText("Page "+Integer.toString(getCurrentPage()+1)+" of "+logic.getTotalPages());
         this.repaint();
@@ -139,13 +147,18 @@ public class gui extends JFrame {
         SwingUtilities.invokeLater(() -> new gui());
     }
 
-    private void finishAction(List<String> imagePaths) {
-        if (imagePaths != null && !imagePaths.isEmpty()) {
-            // Assuming combiner is an object that has the combine method
-            mycombiner.combine(imagePaths);
-            JOptionPane.showMessageDialog(this, "PDF created successfully.", "Success", JOptionPane.INFORMATION_MESSAGE);
-        } else {
-            JOptionPane.showMessageDialog(this, "No images to combine.", "Error", JOptionPane.ERROR_MESSAGE);
+    private void finishAction() {
+        try {
+            List<String> exportPaths = logic.getAllImagePathsForExport();
+            if (exportPaths != null && !exportPaths.isEmpty()) {
+                mycombiner.combine(exportPaths);
+                JOptionPane.showMessageDialog(this, "PDF created successfully.", "Success", JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(this, "No images to combine.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error preparing pages for export: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
 
         resetCoordinates();  // Reset coordinates when finishing redaction
@@ -206,6 +219,7 @@ class ImagePanel extends JPanel {
 
         addMouseListener(new MouseAdapter() {
             @Override
+<<<<<<< codex/replace-two-click-flow-with-click-drag-selection
             public void mousePressed(MouseEvent e) {
                 requestFocusInWindow();
                 Point imagePoint = toImagePoint(e.getX(), e.getY());
@@ -214,6 +228,37 @@ class ImagePanel extends JPanel {
                     dragSelection = new Rectangle(dragStart.x, dragStart.y, 0, 0);
                     pendingSelection = null;
                     repaint();
+=======
+            public void mouseClicked(MouseEvent e) {
+                int clickX = (int) ((e.getX() - drawX) / zoomFactor);
+                int clickY = (int) ((e.getY() - drawY) / zoomFactor);
+
+                if (clickX >= 0 && clickX <= drawWidth / zoomFactor && clickY >= 0 && clickY <= drawHeight / zoomFactor) {
+                    int imageX = (int) ((clickX / (double) drawWidth) * image.getWidth());
+                    int imageY = (int) ((clickY / (double) drawHeight) * image.getHeight());
+
+                    parentGui.coordinatesLabel.setText("X: " + imageX + ", Y: " + imageY);  // Update coordinates in real time
+
+                    if (firstClick == null) {
+                        firstClick = new int[]{imageX, imageY};
+                    } else {
+                        int x1 = firstClick[0], y1 = firstClick[1];
+                        int x2 = imageX, y2 = imageY;
+
+                        if (x2 > x1 && y2 > y1) {
+                            try {
+                                String imagePath = logic.getOrRenderImagePath(parentGui.getCurrentPage());
+                                redactor.redact(imagePath, x1, y1, x2, y2);
+                                logic.refreshPageFromDisk(parentGui.getCurrentPage());
+                                setImage(logic.getOrRenderPage(parentGui.getCurrentPage()));
+                            } catch (IOException ioException) {
+                                ioException.printStackTrace();
+                            }
+                        }
+
+                        firstClick = null;
+                    }
+>>>>>>> master
                 }
             }
 
@@ -269,6 +314,7 @@ class ImagePanel extends JPanel {
         });
     }
 
+<<<<<<< codex/replace-two-click-flow-with-click-drag-selection
     private void updateSelection(int panelX, int panelY) {
         Point imagePoint = toImagePoint(panelX, panelY);
         if (imagePoint == null) {
@@ -336,6 +382,8 @@ class ImagePanel extends JPanel {
         }
     }
 
+=======
+>>>>>>> master
     public void setImage(BufferedImage newImage) {
         this.image = newImage;
         cancelSelection();
