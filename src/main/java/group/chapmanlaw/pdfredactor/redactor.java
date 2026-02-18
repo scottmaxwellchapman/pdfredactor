@@ -19,7 +19,7 @@ import java.util.logging.Logger;
 
 public class redactor {
 
-    // Temporary backup files to store originals before redaction
+    // Per-image backups allow undo to behave correctly across multiple pages.
     private static final Map<String, File> backupFiles = new HashMap<>();
 
     /**
@@ -38,15 +38,18 @@ public class redactor {
 
             File imageFile = new File(inputJpgPath);
             BufferedImage image = ImageIO.read(imageFile);
+            if (image == null) {
+                throw new IOException("Unable to read input image: " + inputJpgPath);
+            }
 
             // Create a graphics context on the buffered image
             Graphics2D g2d = image.createGraphics();
-            g2d.setColor(Color.BLACK); // Set color to black
-            g2d.fillRect(x1, y1, x2 - x1, y2 - y1); // Draw filled rectangle
-            g2d.dispose(); // Release resources
+            g2d.setColor(Color.BLACK);
+            g2d.fillRect(x1, y1, x2 - x1, y2 - y1);
+            g2d.dispose();
 
             // Overwrite the original file with the redacted image
-            saveCompressedJPEG(image, imageFile, 1.0f); // Save with 75% quality
+            saveCompressedJPEG(image, imageFile, 1.0f);
             System.out.println("Redacted area saved: " + inputJpgPath);
         } catch (IOException e) {
             System.err.println("Error processing image: " + e.getMessage());
@@ -60,14 +63,17 @@ public class redactor {
      */
     private static void backupImage(String inputJpgPath) {
         try {
-            // Only create a backup if one for this page does not already exist
+            // Only create a backup if one does not already exist for this image.
             if (!backupFiles.containsKey(inputJpgPath)) {
                 File originalFile = new File(inputJpgPath);
-                File backupFile = logic.createSessionTempFile("backup_", ".jpg", "backups");
+                File backupFile = File.createTempFile("backup_", ".jpg");
+                backupFile.deleteOnExit();
 
-                // Copy the original file to the backup file
                 BufferedImage originalImage = ImageIO.read(originalFile);
-                saveCompressedJPEG(originalImage, backupFile, 1.0f); // Save backup at full quality
+                if (originalImage == null) {
+                    throw new IOException("Unable to read original image: " + inputJpgPath);
+                }
+                saveCompressedJPEG(originalImage, backupFile, 1.0f);
                 backupFiles.put(inputJpgPath, backupFile);
                 System.out.println("Backup created: " + backupFile.getAbsolutePath());
             }
@@ -76,14 +82,6 @@ public class redactor {
         }
     }
 
-    /**
-     * Saves a BufferedImage as a compressed JPEG file.
-     *
-     * @param image   The BufferedImage to save.
-     * @param file    The file to save the image to.
-     * @param quality The compression quality (0.0 - 1.0).
-     * @throws IOException If an error occurs while writing the file.
-     */
     private static void saveCompressedJPEG(BufferedImage image, File file, float quality) throws IOException {
         Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpg");
         if (!writers.hasNext()) {
@@ -94,7 +92,7 @@ public class redactor {
             writer.setOutput(ios);
             ImageWriteParam param = writer.getDefaultWriteParam();
             param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-            param.setCompressionQuality(quality); // Set compression quality
+            param.setCompressionQuality(quality);
 
             writer.write(null, new IIOImage(image, null, null), param);
         } finally {
@@ -110,11 +108,10 @@ public class redactor {
     public static void undo(String inputJpgPath) {
         File backupFile = backupFiles.get(inputJpgPath);
         if (backupFile != null && backupFile.exists()) {
-            // Restore the original image from the backup
             File imageFile = new File(inputJpgPath);
             try {
-                // Copy the backup file back to the original file location
                 Files.copy(backupFile.toPath(), imageFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                backupFiles.remove(inputJpgPath);
             } catch (IOException ex) {
                 Logger.getLogger(redactor.class.getName()).log(Level.SEVERE, null, ex);
             }
