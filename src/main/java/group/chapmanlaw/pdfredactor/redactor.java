@@ -10,14 +10,17 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class redactor {
 
-    // Temporary backup file to store the original image before redaction
-    private static File backupFile = null;
+    // Temporary backup files to store originals before redaction
+    private static final Map<String, File> backupFiles = new HashMap<>();
 
     /**
      * Redacts a given area on a JPEG image by drawing a black rectangle.
@@ -57,15 +60,15 @@ public class redactor {
      */
     private static void backupImage(String inputJpgPath) {
         try {
-            // Only create a backup if it doesn't already exist
-            if (backupFile == null) {
+            // Only create a backup if one for this page does not already exist
+            if (!backupFiles.containsKey(inputJpgPath)) {
                 File originalFile = new File(inputJpgPath);
-                backupFile = File.createTempFile("backup_", ".jpg"); // Create a temporary backup file
-                backupFile.deleteOnExit(); // Ensure the backup is deleted on exit
+                File backupFile = logic.createSessionTempFile("backup_", ".jpg", "backups");
 
                 // Copy the original file to the backup file
                 BufferedImage originalImage = ImageIO.read(originalFile);
                 saveCompressedJPEG(originalImage, backupFile, 1.0f); // Save backup at full quality
+                backupFiles.put(inputJpgPath, backupFile);
                 System.out.println("Backup created: " + backupFile.getAbsolutePath());
             }
         } catch (IOException e) {
@@ -105,15 +108,13 @@ public class redactor {
      * @param inputJpgPath Path to the JPEG file.
      */
     public static void undo(String inputJpgPath) {
+        File backupFile = backupFiles.get(inputJpgPath);
         if (backupFile != null && backupFile.exists()) {
             // Restore the original image from the backup
             File imageFile = new File(inputJpgPath);
-            if (imageFile.exists()) {
-                imageFile.delete(); // Delete the redacted file
-            }
             try {
                 // Copy the backup file back to the original file location
-                Files.copy(backupFile.toPath(), imageFile.toPath());
+                Files.copy(backupFile.toPath(), imageFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
             } catch (IOException ex) {
                 Logger.getLogger(redactor.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -121,5 +122,9 @@ public class redactor {
         } else {
             System.out.println("No backup found, undo not possible.");
         }
+    }
+
+    public static void clearBackups() {
+        backupFiles.clear();
     }
 }

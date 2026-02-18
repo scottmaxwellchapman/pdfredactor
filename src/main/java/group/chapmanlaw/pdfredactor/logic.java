@@ -15,6 +15,8 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -22,6 +24,7 @@ import java.util.List;
 public class logic {
     private static List<String> imagePaths = new ArrayList<>();
     private static int totalPages = 0;
+    private static Path sessionTempDirectory;
     public static String inputPath="";
     public static float qualitySetting = 0.5f;
     public static void convertPDFToImages() {
@@ -40,6 +43,7 @@ public class logic {
         System.out.println("Selected PDF: " + pdfFile.getAbsolutePath());
 
         try (PDDocument document = Loader.loadPDF(pdfFile)) {
+            initializeSessionTempDirectory();
             PDFRenderer renderer = new PDFRenderer(document);
             totalPages = document.getNumberOfPages();
             imagePaths.clear();
@@ -50,8 +54,7 @@ public class logic {
             for (int i = 0; i < totalPages; i++) {
                 BufferedImage image = renderer.renderImageWithDPI(i, 150, ImageType.RGB); // Lower DPI for compression
 
-                File tempFile = File.createTempFile("pdfredactor_" + (i + 1), ".jpg");
-                tempFile.deleteOnExit(); // Auto-delete on exit
+                File tempFile = createSessionTempFile("pdfredactor_page_" + (i + 1) + "_", ".jpg", "pages");
 
                 saveCompressedJPEG(image, tempFile, qualitySetting); // Save with 30% quality
 
@@ -63,6 +66,52 @@ public class logic {
             myw.setVisible(false);
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    private static void initializeSessionTempDirectory() throws IOException {
+        cleanupSessionTempArtifacts();
+        sessionTempDirectory = Files.createTempDirectory("pdfredactor-session-");
+        sessionTempDirectory.toFile().deleteOnExit();
+    }
+
+    public static File createSessionTempFile(String prefix, String suffix, String subdirectory) throws IOException {
+        if (sessionTempDirectory == null) {
+            initializeSessionTempDirectory();
+        }
+
+        Path targetDirectory = sessionTempDirectory;
+        if (subdirectory != null && !subdirectory.isBlank()) {
+            targetDirectory = sessionTempDirectory.resolve(subdirectory);
+            Files.createDirectories(targetDirectory);
+            targetDirectory.toFile().deleteOnExit();
+        }
+
+        File file = Files.createTempFile(targetDirectory, prefix, suffix).toFile();
+        file.deleteOnExit();
+        return file;
+    }
+
+    public static void cleanupSessionTempArtifacts() {
+        redactor.clearBackups();
+
+        if (sessionTempDirectory == null) {
+            imagePaths.clear();
+            totalPages = 0;
+            return;
+        }
+
+        try {
+            Files.walk(sessionTempDirectory)
+                .sorted(Comparator.reverseOrder())
+                .map(Path::toFile)
+                .forEach(File::delete);
+        } catch (IOException e) {
+            System.err.println("Unable to fully clean session files: " + e.getMessage());
+        } finally {
+            sessionTempDirectory = null;
+            imagePaths.clear();
+            totalPages = 0;
         }
     }
 

@@ -78,7 +78,6 @@ public class combiner {
                 document.save(outputFile);
                 myw.setVisible(false);
                 JOptionPane.showMessageDialog(null, "PDF saved successfully!");
-                niceties.exitAd();
             }
 
 

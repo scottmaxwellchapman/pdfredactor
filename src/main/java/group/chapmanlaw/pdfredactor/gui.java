@@ -21,7 +21,7 @@ public class gui extends JFrame {
 
     public gui() {
         setTitle("PDF Redactor Viewer");
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setExtendedState(JFrame.MAXIMIZED_BOTH);
         setLayout(new BorderLayout());
 
@@ -77,6 +77,13 @@ public class gui extends JFrame {
         navPanel.add(exitButton);
         navPanel.add(coordinatesLabel);  // Add coordinates label to the navigation panel
         add(navPanel, BorderLayout.SOUTH);
+
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                exitClick();
+            }
+        });
 
         updateButtonState();
         setVisible(true);
@@ -143,15 +150,18 @@ public class gui extends JFrame {
         if (imagePaths != null && !imagePaths.isEmpty()) {
             // Assuming combiner is an object that has the combine method
             mycombiner.combine(imagePaths);
-            JOptionPane.showMessageDialog(this, "PDF created successfully.", "Success", JOptionPane.INFORMATION_MESSAGE);
         } else {
             JOptionPane.showMessageDialog(this, "No images to combine.", "Error", JOptionPane.ERROR_MESSAGE);
         }
 
         resetCoordinates();  // Reset coordinates when finishing redaction
+        logic.cleanupSessionTempArtifacts();
+        dispose();
+        System.exit(0);
     }
 
     private void exitClick() {
+        logic.cleanupSessionTempArtifacts();
         niceties.exitAd();
     }
 
