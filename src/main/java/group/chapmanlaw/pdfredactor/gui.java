@@ -195,34 +195,45 @@ class ImagePanel extends JPanel {
         addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                int clickX = (int) ((e.getX() - drawX) / zoomFactor);
-                int clickY = (int) ((e.getY() - drawY) / zoomFactor);
+                int clickX = e.getX() - drawX;
+                int clickY = e.getY() - drawY;
 
-                if (clickX >= 0 && clickX <= drawWidth / zoomFactor && clickY >= 0 && clickY <= drawHeight / zoomFactor) {
-                    int imageX = (int) ((clickX / (double) drawWidth) * image.getWidth());
-                    int imageY = (int) ((clickY / (double) drawHeight) * image.getHeight());
+                if (!isWithinImageBounds(clickX, clickY)) {
+                    return;
+                }
 
-                    parentGui.coordinatesLabel.setText("X: " + imageX + ", Y: " + imageY);  // Update coordinates in real time
+                int imageX = toImageX(clickX);
+                int imageY = toImageY(clickY);
 
-                    if (firstClick == null) {
-                        firstClick = new int[]{imageX, imageY};
-                    } else {
-                        int x1 = firstClick[0], y1 = firstClick[1];
-                        int x2 = imageX, y2 = imageY;
+                parentGui.coordinatesLabel.setText("X: " + imageX + ", Y: " + imageY);
 
-                        if (x2 > x1 && y2 > y1) {
-                            try {
-                                String imagePath = logic.getOrRenderImagePath(parentGui.getCurrentPage());
-                                redactor.redact(imagePath, x1, y1, x2, y2);
-                                logic.refreshPageFromDisk(parentGui.getCurrentPage());
-                                setImage(logic.getOrRenderPage(parentGui.getCurrentPage()));
-                            } catch (IOException ioException) {
-                                ioException.printStackTrace();
-                            }
-                        }
+                if (firstClick == null) {
+                    firstClick = new int[]{imageX, imageY};
+                    return;
+                }
 
-                        firstClick = null;
-                    }
+                int x1 = Math.min(firstClick[0], imageX);
+                int y1 = Math.min(firstClick[1], imageY);
+                int x2 = Math.max(firstClick[0], imageX);
+                int y2 = Math.max(firstClick[1], imageY);
+
+                firstClick = null;
+
+                if (x1 == x2 || y1 == y2) {
+                    JOptionPane.showMessageDialog(parentGui,
+                            "Please click two different corners to define a redaction area.",
+                            "Invalid area",
+                            JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+
+                try {
+                    String imagePath = logic.getOrRenderImagePath(parentGui.getCurrentPage());
+                    redactor.redact(imagePath, x1, y1, x2, y2);
+                    logic.refreshPageFromDisk(parentGui.getCurrentPage());
+                    setImage(logic.getOrRenderPage(parentGui.getCurrentPage()));
+                } catch (IOException ioException) {
+                    ioException.printStackTrace();
                 }
             }
         });
@@ -231,17 +242,47 @@ class ImagePanel extends JPanel {
         addMouseMotionListener(new MouseMotionAdapter() {
             @Override
             public void mouseMoved(MouseEvent e) {
-                int mouseX = (int) ((e.getX() - drawX) / zoomFactor);
-                int mouseY = (int) ((e.getY() - drawY) / zoomFactor);
+                int mouseX = e.getX() - drawX;
+                int mouseY = e.getY() - drawY;
 
-                if (mouseX >= 0 && mouseX <= drawWidth / zoomFactor && mouseY >= 0 && mouseY <= drawHeight / zoomFactor) {
-                    int imageX = (int) ((mouseX / (double) drawWidth) * image.getWidth());
-                    int imageY = (int) ((mouseY / (double) drawHeight) * image.getHeight());
-
-                    parentGui.coordinatesLabel.setText("X: " + imageX + ", Y: " + imageY);  // Update coordinates on mouse move
+                if (isWithinImageBounds(mouseX, mouseY)) {
+                    int imageX = toImageX(mouseX);
+                    int imageY = toImageY(mouseY);
+                    parentGui.coordinatesLabel.setText("X: " + imageX + ", Y: " + imageY);
                 }
             }
         });
+    }
+
+
+    private boolean isWithinImageBounds(int x, int y) {
+        if (image == null) {
+            return false;
+        }
+
+        int scaledWidth = (int) (drawWidth * zoomFactor);
+        int scaledHeight = (int) (drawHeight * zoomFactor);
+        return x >= 0 && x <= scaledWidth && y >= 0 && y <= scaledHeight;
+    }
+
+    private int toImageX(int panelX) {
+        if (image == null || drawWidth <= 0) {
+            return 0;
+        }
+        int scaledWidth = (int) (drawWidth * zoomFactor);
+        return clamp((int) ((panelX / (double) scaledWidth) * image.getWidth()), 0, image.getWidth() - 1);
+    }
+
+    private int toImageY(int panelY) {
+        if (image == null || drawHeight <= 0) {
+            return 0;
+        }
+        int scaledHeight = (int) (drawHeight * zoomFactor);
+        return clamp((int) ((panelY / (double) scaledHeight) * image.getHeight()), 0, image.getHeight() - 1);
+    }
+
+    private int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(value, max));
     }
 
     public void setImage(BufferedImage newImage) {
@@ -269,6 +310,9 @@ class ImagePanel extends JPanel {
     }
 
     private void updatePreferredSize() {
+        if (image == null) {
+            return;
+        }
         int width = (int) (image.getWidth() * zoomFactor);
         int height = (int) (image.getHeight() * zoomFactor);
         setPreferredSize(new Dimension(width, height));
