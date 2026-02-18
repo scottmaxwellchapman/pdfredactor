@@ -5,23 +5,19 @@ import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.Loader;
 
-import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
-import javax.imageio.ImageWriteParam;
-import javax.imageio.ImageWriter;
-import javax.imageio.stream.ImageOutputStream;
 import javax.swing.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 public class logic {
     private static final int PAGE_CACHE_SIZE = 3;
+    private static final float RENDER_DPI = 300f;
     private static List<String> imagePaths = new ArrayList<>();
     private static int totalPages = 0;
     private static PDDocument document;
@@ -33,7 +29,7 @@ public class logic {
         }
     };
     public static String inputPath="";
-    public static float qualitySetting = 0.5f;
+    public static float qualitySetting = 1.0f;
 
     public static void convertPDFToImages() {
         // Prompt user for PDF file
@@ -73,20 +69,18 @@ public class logic {
     public static BufferedImage getOrRenderPage(int pageIndex) throws IOException {
         validatePageIndex(pageIndex);
 
-        BufferedImage cachedImage = pageCache.get(pageIndex);
-        if (cachedImage != null) {
-            return cachedImage;
+        BufferedImage image = pageCache.get(pageIndex);
+        if (image == null) {
+            ensureRenderer();
+            image = renderer.renderImageWithDPI(pageIndex, RENDER_DPI, ImageType.RGB);
+            pageCache.put(pageIndex, image);
         }
-
-        ensureRenderer();
-        BufferedImage image = renderer.renderImageWithDPI(pageIndex, 150, ImageType.RGB);
-        pageCache.put(pageIndex, image);
 
         String pagePath = imagePaths.get(pageIndex);
         if (pagePath == null) {
-            File tempFile = File.createTempFile("pdfredactor_" + (pageIndex + 1), ".jpg");
+            File tempFile = File.createTempFile("pdfredactor_" + (pageIndex + 1), ".png");
             tempFile.deleteOnExit();
-            saveCompressedJPEG(image, tempFile, qualitySetting);
+            ImageIO.write(image, "png", tempFile);
             imagePaths.set(pageIndex, tempFile.getAbsolutePath());
             System.out.println("Rendered page " + (pageIndex + 1) + " to: " + tempFile.getAbsolutePath());
         }
@@ -146,7 +140,7 @@ public class logic {
 
         try {
             ensureRenderer();
-            BufferedImage image = renderer.renderImageWithDPI(pageIndex, 150, ImageType.RGB);
+            BufferedImage image = renderer.renderImageWithDPI(pageIndex, RENDER_DPI, ImageType.RGB);
             pageCache.put(pageIndex, image);
         } catch (IOException e) {
             System.err.println("Unable to prefetch page " + (pageIndex + 1) + ": " + e.getMessage());
@@ -165,24 +159,6 @@ public class logic {
         }
         document = null;
         renderer = null;
-    }
-
-    private static void saveCompressedJPEG(BufferedImage image, File file, float quality) throws IOException {
-        Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpg");
-        if (!writers.hasNext()) {
-            throw new IOException("No JPEG writer available.");
-        }
-        ImageWriter writer = writers.next();
-        try (ImageOutputStream ios = ImageIO.createImageOutputStream(file)) {
-            writer.setOutput(ios);
-            ImageWriteParam param = writer.getDefaultWriteParam();
-            param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-            param.setCompressionQuality(quality); // Set compression quality (0.0 - 1.0)
-
-            writer.write(null, new IIOImage(image, null, null), param);
-        } finally {
-            writer.dispose();
-        }
     }
 
     public static List<String> getImagePaths() {
