@@ -17,7 +17,7 @@ import java.util.Map;
 
 public class logic {
     private static final int PAGE_CACHE_SIZE = 3;
-    private static final float RENDER_DPI = 300f;
+    private static final float BASE_RENDER_DPI = 300f;
     private static List<String> imagePaths = new ArrayList<>();
     private static int totalPages = 0;
     private static PDDocument document;
@@ -31,15 +31,15 @@ public class logic {
     public static String inputPath="";
     public static float qualitySetting = 1.0f;
 
-    public static void convertPDFToImages() {
+    public static boolean convertPDFToImages() {
         // Prompt user for PDF file
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setDialogTitle("Select a PDF file");
         int result = fileChooser.showOpenDialog(null);
 
         if (result != JFileChooser.APPROVE_OPTION) {
-            System.out.println("No file selected. Exiting.");
-            return;
+            System.out.println("No file selected.");
+            return false;
         }
 
         File pdfFile = fileChooser.getSelectedFile();
@@ -61,8 +61,10 @@ public class logic {
             myw.setLocationRelativeTo(null);
             myw.setVisible(false);
             System.out.println("Opened document. Total pages: " + totalPages);
+            return true;
         } catch (IOException e) {
             e.printStackTrace();
+            return false;
         }
     }
 
@@ -72,7 +74,7 @@ public class logic {
         BufferedImage image = pageCache.get(pageIndex);
         if (image == null) {
             ensureRenderer();
-            image = renderer.renderImageWithDPI(pageIndex, RENDER_DPI, ImageType.RGB);
+            image = renderer.renderImageWithDPI(pageIndex, getRenderDpi(), ImageType.RGB);
             pageCache.put(pageIndex, image);
         }
 
@@ -140,11 +142,17 @@ public class logic {
 
         try {
             ensureRenderer();
-            BufferedImage image = renderer.renderImageWithDPI(pageIndex, RENDER_DPI, ImageType.RGB);
+            BufferedImage image = renderer.renderImageWithDPI(pageIndex, getRenderDpi(), ImageType.RGB);
             pageCache.put(pageIndex, image);
         } catch (IOException e) {
             System.err.println("Unable to prefetch page " + (pageIndex + 1) + ": " + e.getMessage());
         }
+    }
+
+
+    private static float getRenderDpi() {
+        float clampedQuality = Math.max(0.1f, Math.min(1.0f, qualitySetting));
+        return BASE_RENDER_DPI * clampedQuality;
     }
 
     private static void validatePageIndex(int pageIndex) {

@@ -7,6 +7,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
@@ -14,8 +16,8 @@ import java.util.logging.Logger;
 
 public class redactor {
 
-    // Per-image backups allow undo to behave correctly across multiple pages.
-    private static final Map<String, File> backupFiles = new HashMap<>();
+    // Multi-step per-image backups support multiple undo operations.
+    private static final Map<String, Deque<File>> backupFiles = new HashMap<>();
 
     /**
      * Redacts a given area on an image by drawing a black rectangle.
@@ -67,20 +69,18 @@ public class redactor {
         }
 
         try {
-            // Only create a backup if one does not already exist for this image.
-            if (!backupFiles.containsKey(inputJpgPath)) {
-                File originalFile = new File(inputJpgPath);
-                File backupFile = File.createTempFile("backup_", ".png");
-                backupFile.deleteOnExit();
+            File originalFile = new File(inputJpgPath);
+            File backupFile = File.createTempFile("backup_", ".png");
+            backupFile.deleteOnExit();
 
-                BufferedImage originalImage = ImageIO.read(originalFile);
-                if (originalImage == null) {
-                    throw new IOException("Unable to read original image: " + inputJpgPath);
-                }
-                ImageIO.write(originalImage, "png", backupFile);
-                backupFiles.put(inputJpgPath, backupFile);
-                System.out.println("Backup created: " + backupFile.getAbsolutePath());
+            BufferedImage originalImage = ImageIO.read(originalFile);
+            if (originalImage == null) {
+                throw new IOException("Unable to read original image: " + inputJpgPath);
             }
+            ImageIO.write(originalImage, "png", backupFile);
+
+            backupFiles.computeIfAbsent(inputJpgPath, key -> new ArrayDeque<>()).push(backupFile);
+            System.out.println("Backup created: " + backupFile.getAbsolutePath());
         } catch (IOException e) {
             System.err.println("Error backing up the image: " + e.getMessage());
         }
@@ -97,18 +97,24 @@ public class redactor {
             return;
         }
 
-        File backupFile = backupFiles.get(inputJpgPath);
-        if (backupFile != null && backupFile.exists()) {
-            File imageFile = new File(inputJpgPath);
-            try {
-                Files.copy(backupFile.toPath(), imageFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                backupFiles.remove(inputJpgPath);
-            } catch (IOException ex) {
-                Logger.getLogger(redactor.class.getName()).log(Level.SEVERE, null, ex);
+        Deque<File> history = backupFiles.get(inputJpgPath);
+        if (history != null && !history.isEmpty()) {
+            File backupFile = history.pop();
+            if (backupFile.exists()) {
+                File imageFile = new File(inputJpgPath);
+                try {
+                    Files.copy(backupFile.toPath(), imageFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                } catch (IOException ex) {
+                    Logger.getLogger(redactor.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                if (history.isEmpty()) {
+                    backupFiles.remove(inputJpgPath);
+                }
+                System.out.println("Undo successful, restored previous image state: " + inputJpgPath);
+                return;
             }
-            System.out.println("Undo successful, restored original image: " + inputJpgPath);
-        } else {
-            System.out.println("No backup found, undo not possible.");
         }
+
+        System.out.println("No backup found, undo not possible.");
     }
 }

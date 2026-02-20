@@ -33,7 +33,8 @@ public class gui extends JFrame {
         if (imagePaths.isEmpty() || totalPages == 0) {
             JOptionPane.showMessageDialog(this, "No images loaded. Run PDF conversion first.", "Error", JOptionPane.ERROR_MESSAGE);
             niceties.exitAd();
-            System.exit(0);
+            dispose();
+            return;
         }
 
         // Create Image Panel with reference to this (gui instance)
@@ -153,8 +154,11 @@ public class gui extends JFrame {
             if (exportPaths != null && !exportPaths.isEmpty()) {
                 boolean saved = mycombiner.combine(exportPaths);
                 if (!saved) {
-                    JOptionPane.showMessageDialog(this, "Save cancelled. No PDF was created.", "Cancelled", JOptionPane.WARNING_MESSAGE);
+                    JOptionPane.showMessageDialog(this, "Save cancelled. Continue editing or use Exit Without Saving.", "Cancelled", JOptionPane.WARNING_MESSAGE);
+                    return;
                 }
+                dispose();
+                return;
             } else {
                 JOptionPane.showMessageDialog(this, "No images to combine.", "Error", JOptionPane.ERROR_MESSAGE);
             }
@@ -167,7 +171,15 @@ public class gui extends JFrame {
     }
 
     private void exitClick() {
-        niceties.exitAd();
+        int choice = JOptionPane.showConfirmDialog(this,
+                "Exit without saving your current redactions?",
+                "Confirm Exit",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+        if (choice == JOptionPane.YES_OPTION) {
+            niceties.exitAd();
+            dispose();
+        }
     }
 
     private void resetCoordinates() {

@@ -84,8 +84,6 @@ public class niceties {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
-        System.exit(0);
     }
 
     private static void openBrowser(String url) {

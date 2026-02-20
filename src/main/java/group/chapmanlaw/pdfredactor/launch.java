@@ -173,9 +173,13 @@ public class launch extends javax.swing.JFrame {
         logic.qualitySetting = quality;
         this.setVisible(false);
         javax.swing.JOptionPane.showMessageDialog(null, "The larger your PDF is, the larger the load and save time will be. Please be patient with large PDFs.");
-        logic.convertPDFToImages();
-        gui myGui = new gui();
+        boolean loaded = logic.convertPDFToImages();
+        if (!loaded) {
+            this.setVisible(true);
+            return;
+        }
 
+        gui myGui = new gui();
         myGui.setVisible(true);
 
     }//GEN-LAST:event_jButton1ActionPerformed
