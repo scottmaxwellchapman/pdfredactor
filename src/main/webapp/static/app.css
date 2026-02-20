@@ -1,0 +1,75 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f3f5f9;
+    color: #162029;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header h1 {
+    margin: 0;
+}
+
+header h1 span {
+    font-size: 0.7em;
+    color: #1f5a9d;
+}
+
+.panel {
+    background: #fff;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 16px;
+}
+
+#uploadForm {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+button {
+    border: none;
+    background: #1f5a9d;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+button:disabled {
+    background: #9aa8ba;
+    cursor: default;
+}
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+#canvasWrapper {
+    margin-top: 12px;
+    height: 70vh;
+    overflow: auto;
+    border: 1px solid #d5dce5;
+    border-radius: 6px;
+    background: #efefef;
+}
+
+#pdfCanvas {
+    display: block;
+    margin: 0 auto;
+}
+
+.steps {
+    font-weight: bold;
+}
