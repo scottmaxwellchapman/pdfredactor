@@ -45,7 +45,7 @@ public class launch extends javax.swing.JFrame {
         jLabel1.setText("PDF Redactor");
 
         jLabel2.setFont(new java.awt.Font("Helvetica Neue", 1, 18)); // NOI18N
-        jLabel2.setText("v1.0.0");
+        jLabel2.setText("v1.1.0");
 
         jButton1.setBackground(new java.awt.Color(204, 255, 204));
         jButton1.setFont(new java.awt.Font("Helvetica Neue", 1, 18)); // NOI18N
