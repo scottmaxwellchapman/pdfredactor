@@ -18,6 +18,43 @@ public class combiner {
         myw.setLocationRelativeTo(null);
         myw.setVisible(true);
 
+        try {
+            String inputPath = logic.inputPath;
+            File inputFile = (inputPath == null || inputPath.isBlank()) ? null : new File(inputPath);
+            File parentDirectory = (inputFile == null) ? new File(System.getProperty("user.home")) : inputFile.getAbsoluteFile().getParentFile();
+            if (parentDirectory == null) {
+                parentDirectory = new File(System.getProperty("user.home"));
+            }
+
+            String baseFilename = (inputFile == null) ? "redacted_document" : inputFile.getName().replaceFirst("[.][^.]+$", "");
+            String defaultFilename = baseFilename + "_redacted.pdf";
+
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setDialogTitle("Save Combined PDF");
+            fileChooser.setCurrentDirectory(parentDirectory);
+            fileChooser.setSelectedFile(new File(parentDirectory, defaultFilename));
+
+            int result = fileChooser.showSaveDialog(null);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File outputFile = fileChooser.getSelectedFile();
+                combineToFile(imagePaths, outputFile);
+                JOptionPane.showMessageDialog(null, "PDF saved successfully!");
+                niceties.exitAd();
+                return true;
+            }
+
+            return false;
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(null, "Error creating PDF: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace();
+            return false;
+        } finally {
+            myw.setVisible(false);
+            myw.dispose();
+        }
+    }
+
+    public static void combineToFile(List<String> imagePaths, File outputFile) throws IOException {
         try (PDDocument document = new PDDocument()) {
             for (String imagePath : imagePaths) {
                 File imageFile = new File(imagePath);
@@ -51,38 +88,7 @@ public class combiner {
                 }
             }
 
-            String inputPath = logic.inputPath;
-            File inputFile = (inputPath == null || inputPath.isBlank()) ? null : new File(inputPath);
-            File parentDirectory = (inputFile == null) ? new File(System.getProperty("user.home")) : inputFile.getAbsoluteFile().getParentFile();
-            if (parentDirectory == null) {
-                parentDirectory = new File(System.getProperty("user.home"));
-            }
-
-            String baseFilename = (inputFile == null) ? "redacted_document" : inputFile.getName().replaceFirst("[.][^.]+$", "");
-            String defaultFilename = baseFilename + "_redacted.pdf";
-
-            JFileChooser fileChooser = new JFileChooser();
-            fileChooser.setDialogTitle("Save Combined PDF");
-            fileChooser.setCurrentDirectory(parentDirectory);
-            fileChooser.setSelectedFile(new File(parentDirectory, defaultFilename));
-
-            int result = fileChooser.showSaveDialog(null);
-            if (result == JFileChooser.APPROVE_OPTION) {
-                File outputFile = fileChooser.getSelectedFile();
-                document.save(outputFile);
-                JOptionPane.showMessageDialog(null, "PDF saved successfully!");
-                niceties.exitAd();
-                return true;
-            }
-
-            return false;
-        } catch (IOException e) {
-            JOptionPane.showMessageDialog(null, "Error creating PDF: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-            e.printStackTrace();
-            return false;
-        } finally {
-            myw.setVisible(false);
-            myw.dispose();
+            document.save(outputFile);
         }
     }
 }
