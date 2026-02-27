@@ -7,6 +7,7 @@ import org.apache.pdfbox.Loader;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -42,20 +43,9 @@ public class logic {
             return false;
         }
 
-        File pdfFile = fileChooser.getSelectedFile();
-        inputPath = pdfFile.getAbsolutePath();
-        System.out.println("Selected PDF: " + pdfFile.getAbsolutePath());
-
         try {
-            closeOpenDocument();
-            document = Loader.loadPDF(pdfFile);
-            renderer = new PDFRenderer(document);
-            totalPages = document.getNumberOfPages();
-            imagePaths.clear();
-            for (int i = 0; i < totalPages; i++) {
-                imagePaths.add(null);
-            }
-            pageCache.clear();
+            File pdfFile = fileChooser.getSelectedFile();
+            openPdf(pdfFile.getAbsolutePath());
             working myw = new working();
             myw.setVisible(true);
             myw.setLocationRelativeTo(null);
@@ -66,6 +56,30 @@ public class logic {
             e.printStackTrace();
             return false;
         }
+    }
+
+    public static void openPdf(String pdfPath) throws IOException {
+        if (pdfPath == null || pdfPath.isBlank()) {
+            throw new IOException("No PDF path provided.");
+        }
+
+        File pdfFile = new File(pdfPath);
+        if (!pdfFile.exists()) {
+            throw new IOException("PDF file does not exist: " + pdfPath);
+        }
+
+        inputPath = pdfFile.getAbsolutePath();
+        System.out.println("Selected PDF: " + inputPath);
+
+        closeOpenDocument();
+        document = Loader.loadPDF(pdfFile);
+        renderer = new PDFRenderer(document);
+        totalPages = document.getNumberOfPages();
+        imagePaths.clear();
+        for (int i = 0; i < totalPages; i++) {
+            imagePaths.add(null);
+        }
+        pageCache.clear();
     }
 
     public static BufferedImage getOrRenderPage(int pageIndex) throws IOException {
@@ -153,6 +167,30 @@ public class logic {
     private static float getRenderDpi() {
         float clampedQuality = Math.max(0.1f, Math.min(1.0f, qualitySetting));
         return BASE_RENDER_DPI * clampedQuality;
+    }
+
+    public static float getCurrentRenderDpi() {
+        return getRenderDpi();
+    }
+
+    public static Dimension getPageDimensionsInPixels(int pageIndex) throws IOException {
+        validatePageIndex(pageIndex);
+        ensureRenderer();
+        float dpi = getRenderDpi();
+        float widthPoints = document.getPage(pageIndex).getMediaBox().getWidth();
+        float heightPoints = document.getPage(pageIndex).getMediaBox().getHeight();
+        int widthPixels = Math.max(1, Math.round((widthPoints / 72f) * dpi));
+        int heightPixels = Math.max(1, Math.round((heightPoints / 72f) * dpi));
+        return new Dimension(widthPixels, heightPixels);
+    }
+
+    public static List<Dimension> getAllPageDimensionsInPixels() throws IOException {
+        ensureRenderer();
+        List<Dimension> dimensions = new ArrayList<>();
+        for (int i = 0; i < totalPages; i++) {
+            dimensions.add(getPageDimensionsInPixels(i));
+        }
+        return dimensions;
     }
 
     private static void validatePageIndex(int pageIndex) {
