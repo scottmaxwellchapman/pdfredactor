@@ -18,6 +18,11 @@ You can now run the app without launching Swing UI:
   - Optional quality argument: `quality=0.1-1.0`
   - Output format is CSV per line: `pageNumber,widthPx,heightPx`
 
+- Export page images and pixel metadata for downstream applications:
+  - `java -cp target/pdfredactor-1.0-SNAPSHOT.jar group.chapmanlaw.pdfredactor.app inspect input.pdf ./pages ./pages/manifest.json quality=1.0`
+  - CSV output format per line: `pageNumber,widthPx,heightPx,absoluteImagePath`
+  - Optional manifest JSON contains page index/number, width/height in pixels, and image path.
+
 - Apply per-page redactions in pixels and save to a new PDF:
   - `java -cp target/pdfredactor-1.0-SNAPSHOT.jar group.chapmanlaw.pdfredactor.app redact input.pdf output.pdf 1:100,100,80,60 2:200,300,120,40 quality=1.0`
   - Redaction tokens use `page:x,y,width,height` where page numbering is 1-based.
@@ -26,6 +31,9 @@ For embedded integrations, call `group.chapmanlaw.pdfredactor.headless` directly
 
 - `openPdf(String inputPdfPath, float quality)`
 - `getPageDimensionsInPixels()`
+- `exportPageImages(String outputDirectoryPath)`
+- `exportPageImages(String outputDirectoryPath, String filePrefix)`
+- `writePageManifestJson(String outputFilePath, List<PageImageInfo> pages)`
 - `applyPixelRedactions(Map<Integer, List<Rectangle>> redactionsByPage, String outputPdfPath)`
 
 `redactionsByPage` uses zero-based page indexes with rectangle values in rendered pixel coordinates.

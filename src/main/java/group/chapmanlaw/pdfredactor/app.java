@@ -32,6 +32,10 @@ public class app {
                 runDimensions(args);
                 return;
             }
+            if ("inspect".equalsIgnoreCase(mode)) {
+                runInspect(args);
+                return;
+            }
             if ("redact".equalsIgnoreCase(mode)) {
                 runRedact(args);
                 return;
@@ -61,6 +65,42 @@ public class app {
         }
     }
 
+    private static void runInspect(String[] args) throws IOException {
+        if (args.length < 3) {
+            printUsage();
+            throw new IOException("Missing arguments for inspect mode.");
+        }
+
+        String inputPdf = args[1];
+        String outputDirectory = args[2];
+        String manifestFile = null;
+        Float quality = null;
+
+        for (int i = 3; i < args.length; i++) {
+            String token = args[i];
+            if (token.startsWith("quality=")) {
+                quality = parseQualityToken(token);
+                continue;
+            }
+            if (manifestFile == null) {
+                manifestFile = token;
+                continue;
+            }
+            throw new IOException("Unexpected argument for inspect mode: " + token);
+        }
+
+        headless.openPdf(inputPdf, quality == null ? 1.0f : quality);
+        List<headless.PageImageInfo> pages = headless.exportPageImages(outputDirectory);
+        if (manifestFile != null) {
+            headless.writePageManifestJson(manifestFile, pages);
+            System.out.println("Manifest written to: " + manifestFile);
+        }
+
+        for (headless.PageImageInfo page : pages) {
+            System.out.println(page.pageNumber() + "," + page.widthPixels() + "," + page.heightPixels() + "," + page.imagePath());
+        }
+    }
+
     private static void runRedact(String[] args) throws IOException {
         if (args.length < 4) {
             printUsage();
@@ -75,7 +115,7 @@ public class app {
         for (int i = 3; i < args.length; i++) {
             String token = args[i];
             if (token.startsWith("quality=")) {
-                quality = Float.parseFloat(token.substring("quality=".length()));
+                quality = parseQualityToken(token);
                 continue;
             }
 
@@ -121,12 +161,17 @@ public class app {
         if (!raw.startsWith("quality=")) {
             throw new IOException("Unexpected argument: " + raw + ". Optional quality argument must use quality=<value>.");
         }
-        return Float.parseFloat(raw.substring("quality=".length()));
+        return parseQualityToken(raw);
+    }
+
+    private static float parseQualityToken(String token) {
+        return Float.parseFloat(token.substring("quality=".length()));
     }
 
     private static void printUsage() {
         System.out.println("Usage:");
         System.out.println("  dimensions <input.pdf> [quality=0.1-1.0]");
+        System.out.println("  inspect <input.pdf> <outputDir> [manifest.json] [quality=0.1-1.0]");
         System.out.println("  redact <input.pdf> <output.pdf> <page:x,y,width,height>... [quality=0.1-1.0]");
     }
 }

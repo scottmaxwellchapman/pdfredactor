@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 
@@ -48,6 +49,31 @@ class HeadlessTest {
             assertEquals(Color.BLACK.getRGB(), page.getRGB(120, 120));
         }
     }
+
+
+    @Test
+    void exportsPageImagesAndManifestForEmbeddedIntegrations() throws Exception {
+        File inputPdf = createLetterPdf(2);
+        File outputDir = Files.createTempDirectory("headless-inspect").toFile();
+        File manifestFile = new File(outputDir, "manifest.json");
+
+        headless.openPdf(inputPdf.getAbsolutePath(), 1.0f);
+        List<headless.PageImageInfo> pages = headless.exportPageImages(outputDir.getAbsolutePath(), "sheet");
+        headless.writePageManifestJson(manifestFile.getAbsolutePath(), pages);
+
+        assertEquals(2, pages.size());
+        assertTrue(new File(pages.get(0).imagePath()).exists());
+        assertTrue(new File(pages.get(1).imagePath()).exists());
+        assertEquals(2550, pages.get(0).widthPixels());
+        assertEquals(3300, pages.get(0).heightPixels());
+
+        String manifest = Files.readString(manifestFile.toPath());
+        assertTrue(manifest.contains("\"pageNumber\": 1"));
+        assertTrue(manifest.contains("\"pageNumber\": 2"));
+        assertTrue(manifest.contains("\"widthPixels\": 2550"));
+        assertTrue(manifest.contains("\"heightPixels\": 3300"));
+    }
+
 
     private File createLetterPdf(int pages) throws Exception {
         File file = File.createTempFile("headless-test", ".pdf");
